@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class Bird : MonoBehaviour
 {
-    private const float JUMP_AMOUNT = 120f;
+    private float jumpAmount = 120f;
 
     private Rigidbody2D birdRigidbody2D;
     public Text keyText;
@@ -33,6 +33,9 @@ public class Bird : MonoBehaviour
     
     void Update()
     {
+        if (!dead && birdRigidbody2D.bodyType != RigidbodyType2D.Static)
+            transform.Rotate(Vector3.forward * -75f * Time.deltaTime, Space.Self);
+
         if (Input.GetKeyDown(keySetting))
         {
             if (colorChangeable)
@@ -49,11 +52,16 @@ public class Bird : MonoBehaviour
             transform.position += new Vector3(-0.5f, 0, 0);
     }
 
-    
     private void Jump()
     {
-        if(birdRigidbody2D.bodyType == RigidbodyType2D.Dynamic)
-            birdRigidbody2D.velocity = Vector2.up * JUMP_AMOUNT;
+        
+        if (birdRigidbody2D.bodyType == RigidbodyType2D.Dynamic)
+        {
+            birdRigidbody2D.velocity = Vector2.up * jumpAmount;
+            SoundManager.GetInstance().SoundBirdWing();
+            transform.rotation = Quaternion.identity;
+            transform.rotation = Quaternion.Euler(0f, 0f, 35f);
+        }
     }
 
     public void Restart()
@@ -65,6 +73,10 @@ public class Bird : MonoBehaviour
         transform.position = new Vector3(-75,0,0);
         birdRigidbody2D.simulated = true;
         keyText.text = "";
+
+        jumpAmount = 120f;
+        birdRigidbody2D.gravityScale = 30;
+        transform.localScale = new Vector3(5f, 5f, 1f);
     }
 
     public void Create(KeyCode key)
@@ -86,6 +98,7 @@ public class Bird : MonoBehaviour
     public void Change(float x, float y,bool staticState)
     {
         dead = false;
+        transform.rotation = Quaternion.identity;
         transform.position = new Vector3(x, y, 0);
         if (staticState)
             birdRigidbody2D.bodyType = RigidbodyType2D.Static;
@@ -108,10 +121,43 @@ public class Bird : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        birdRigidbody2D.bodyType =  RigidbodyType2D.Static;
-        birdRigidbody2D.simulated = false;
-        dead = true;
-        OnDied?.Invoke(this, System.EventArgs.Empty);
-        keyText.text = Level.GetInstance().GetCoins().ToString();
+        if(collision.gameObject.name == "Stone")
+        {
+            birdRigidbody2D.gravityScale *= 2;
+            jumpAmount *= 1.5f;
+            Level.GetInstance().KillPowerUp();
+        }
+        else if (collision.gameObject.name == "Baloon")
+        {
+            birdRigidbody2D.gravityScale /= 2;
+            jumpAmount /= 1.5f;
+            Level.GetInstance().KillPowerUp();
+        }
+        else if (collision.gameObject.name == "BigPill")
+        {
+            transform.localScale = transform.localScale * 1.5f;
+            jumpAmount /= 1.25f;
+            Level.GetInstance().KillPowerUp();
+        }
+        else if (collision.gameObject.name == "SmallPill")
+        {
+            transform.localScale = transform.localScale / 1.5f;
+            jumpAmount *= 1.25f;
+            Level.GetInstance().KillPowerUp();
+        }
+        else
+        {
+            birdRigidbody2D.bodyType = RigidbodyType2D.Static;
+            birdRigidbody2D.simulated = false;
+
+            dead = true;
+
+            SoundManager.GetInstance().SoundBirdDied();
+
+            OnDied?.Invoke(this, System.EventArgs.Empty);
+
+            keyText.text = Level.GetInstance().GetCoins().ToString();
+        }
+       
     }
 }

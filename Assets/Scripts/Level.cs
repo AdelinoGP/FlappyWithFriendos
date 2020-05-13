@@ -39,12 +39,15 @@ public class Level : MonoBehaviour
 
     public event System.EventHandler Ended;
 
+    private Transform powerUp;
+
     private void Awake()
     {
         instance = this;
         pipeList = new List<Pipe>();
         birdList = new List<Bird>();
         coins = 0;
+        highScoreCoins = PlayerPrefs.GetInt("HighScore");
         pipeSpawnTimer = 0;
         previousGapY = 50;
         Random.InitState((int)Time.time);
@@ -75,7 +78,10 @@ public class Level : MonoBehaviour
             {
                 gameRunning = false;
                 if (coins > highScoreCoins)
+                {
                     highScoreCoins = coins;
+                    PlayerPrefs.SetInt("HighScore", (int)highScoreCoins);
+                }
                 Ended?.Invoke(this, System.EventArgs.Empty);
             }
         }
@@ -91,6 +97,11 @@ public class Level : MonoBehaviour
         bird.Create(keyPressed);
         birdList.Add(bird);
         bird.OnDied += Level_OnDied;
+    }
+
+    public void KillPowerUp()
+    {
+        Destroy(powerUp.gameObject);
     }
 
     private void HandlePipeSpawn()
@@ -114,6 +125,7 @@ public class Level : MonoBehaviour
 
     private void HandlePipeMovement()
     {
+        float coinsTemp = coins;
         for (int i=0; i< pipeList.Count; i++)
         {
             Pipe pipe = pipeList[i];
@@ -131,6 +143,16 @@ public class Level : MonoBehaviour
                 
             }
         }
+
+        if (powerUp != null)
+        {
+            powerUp.position += new Vector3(-1f, 0, 0) * PIPE_MOVE_SPEED * Time.deltaTime * (coins / 100f + 1f);
+            if (powerUp.position.x < -150f)
+                Destroy(powerUp.gameObject);
+        }
+        if (coins != coinsTemp)
+            SoundManager.GetInstance().SoundGotCoin();
+
     }
 
     public void BirdShow()
@@ -154,12 +176,20 @@ public class Level : MonoBehaviour
                 pipe.Remove();
                 pipeList.Remove(pipe);
             }
-            for (int i = 0;i < birdList.Count ;i++)
+            if(birdList.Count > 1)
             {
-                Bird bird = birdList[i];
+                for (int i = 0; i < birdList.Count; i++)
+                {
+                    Bird bird = birdList[i];
 
-                bird.Change(-75f, 40-(90/birdList.Count)*i,true);
+                    bird.Change(-75f, 40 - (90 / birdList.Count) * i, true);
+                }
             }
+            else
+                birdList[0].Change(-75f, 0, true);
+
+            if (powerUp!= null)
+                Destroy(powerUp.gameObject);
             gameRestarted = true;
             coins = 0;
             Debug.Log("level reiniciado");
@@ -174,6 +204,12 @@ public class Level : MonoBehaviour
     {
         CreatePipe(gapY - gapSize * .5f, xPosition, true);
         CreatePipe(CAMERA_ORTHO_SIZE * 2f -gapY -gapSize * .5f, xPosition, false);
+
+        if (powerUp == null && Random.Range(1, 10) > 7)
+        {
+            powerUp = Instantiate(GameAssets.GetInstance().pfPowerUp);
+            powerUp.position = new Vector3(xPosition, Random.Range(gapY - (gapSize / 2), gapY + (gapSize / 2))- CAMERA_ORTHO_SIZE, 0);
+        }
     }
     
     private void CreatePipe(float height, float xPosition, bool bottom)
